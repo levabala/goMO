@@ -1,14 +1,18 @@
 package main
 
-import "gomo/matrix"
+import (
+	"gomo/lpt"
+	"strings"
+)
 
 func main() {
-	m := matrix.Matrix{
-		{1, -2, 1, 1},
-		{2, 3, -1, -1},
-		{1, -1, 2, 0},
-	}
+	input := `
+| 1x1 -1x2 >= -2
+| 5x1 +2x2 <= 15
+| 3x1 -1x2 -1x3 = 3
+1x2 >= 0, 1x3 >= 0
+Z = 1x1 -2x3 -> (max)`
 
-	mg := m.OriginalBaseVector()
-	println(mg.ToString())
+	l := lpt.ParseLPT(strings.Split(input, "\n")[1:])
+	lpt.CanonicalForm(l)
 }

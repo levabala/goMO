@@ -1,6 +1,10 @@
 package lpt
 
-import "gomo/matrix"
+import (
+	"gomo/matrix"
+	"strconv"
+	"strings"
+)
 
 // Bound shows or Max value or Min value
 type Bound int
@@ -84,7 +88,7 @@ func CanonicalForm(task LPT) CLPT {
 	// variable that shows maximal x's index (starting from 0)
 	maxXIndex := 0
 	for _, lim := range task.limitations {
-		l := len(lim.operandsLeft)
+		l := len(lim.operandsLeft) - 1
 		if l > maxXIndex {
 			maxXIndex = l
 		}
@@ -123,6 +127,7 @@ func CanonicalForm(task LPT) CLPT {
 			}
 
 			newOperandsLeft[maxXIndex-1] = x
+			operandsLeft = newOperandsLeft
 		}
 
 		limitations[i] = ConditionEqual{
@@ -132,7 +137,7 @@ func CanonicalForm(task LPT) CLPT {
 	}
 
 	// make every condition's operandsLeft Vector length equal
-	for i, lim := range task.limitations {
+	for i, lim := range limitations {
 		newOperandsLeft := matrix.ShellV(maxXIndex)
 		for i, x := range lim.operandsLeft {
 			newOperandsLeft[i] = x
@@ -156,13 +161,165 @@ func CanonicalForm(task LPT) CLPT {
 	for i := 0; i < newXesCount; i++ {
 		xIndex := maxXIndexAtStart + i + 1
 
-		operandsLeft := matrix.ShellV(maxXIndex)
+		operandsLeft := matrix.ShellV(maxXIndex + 1)
 		operandsLeft[xIndex] = 1
 
-		signConditions[i+1] = ConditionZeroPositive{
+		pushI := len(task.signConditions) + i
+		signConditions[pushI] = ConditionZeroPositive{
 			operandsLeft,
 		}
 	}
 
+	// III. Emulate positiviness condition for unlimited variables
+	limitedVector := make([]int, len(signConditions))
+	for _, cond := range signConditions {
+		xIndex := -1
+		for i, v := range cond.operandsLeft {
+			if v == 1 {
+				xIndex = i
+				break
+			}
+		}
+
+		limitedVector[xIndex] = 1
+	}
+
+	// erm, it's so many codelines in golang to just invert vector's values! disappointing..
+	unlimitedVector := make([]int, len(limitedVector))
+	for i, v := range limitedVector {
+		if v == 0 {
+			unlimitedVector[i] = 1
+		}
+	}
+
 	return CLPT{}
+}
+
+func parseX(str string) (int, int) {
+	arr := strings.Split(str, "x")
+	value, _ := strconv.ParseInt(arr[0], 10, 64)
+	index, _ := strconv.ParseInt(arr[1], 10, 64)
+
+	valueI := int(value)
+	indexI := int(index) - 1
+
+	return valueI, indexI
+}
+
+func parseXes(str []string) matrix.Vector {
+	v := matrix.Vector{}
+
+	for _, s := range str {
+		value, index := parseX(s)
+
+		for len(v) < index+1 {
+			v = append(v, 0)
+		}
+
+		v[index] = float64(value)
+	}
+
+	return v
+}
+
+// ParseLPT parses string array to LPT
+func ParseLPT(lines []string) LPT {
+	linesCount := len(lines)
+
+	limitationsS := lines[:linesCount-2]
+	signConditionsS := lines[linesCount-2]
+	targetFunctionS := lines[linesCount-1]
+
+	// parsing limitations
+	limitations := make([]Condition, len(limitationsS))
+	for i, line := range limitationsS {
+		chunks := strings.Split(line, " ")
+		chunksCount := len(chunks)
+
+		operandRight, _ := strconv.ParseFloat(chunks[chunksCount-1], 64)
+		operatorS := chunks[chunksCount-2]
+
+		var operator Operator
+		switch operatorS {
+		case ">=":
+			operator = OperatorGreaterOrEqual
+		case "=":
+			operator = OperatorEqual
+		case "<=":
+			operator = OperatorLessOrEqual
+		case ">":
+			operator = OperatorGreater
+		case "<":
+			operator = OperatorLess
+		}
+
+		coeffsS := chunks[1 : chunksCount-2]
+		operandsLeft := matrix.Vector{}
+
+		for _, coeffS := range coeffsS {
+			value, index := parseX(coeffS)
+
+			for len(operandsLeft) < index+1 {
+				operandsLeft = append(operandsLeft, 0)
+			}
+
+			operandsLeft[index] = float64(value)
+		}
+
+		cond := Condition{
+			operandsLeft,
+			operator,
+			operandRight,
+		}
+
+		limitations[i] = cond
+	}
+
+	// parsing signs
+	signConditionsSChunks := strings.Split(signConditionsS, ", ")
+	signConditions := make([]ConditionZero, len(signConditionsSChunks))
+
+	for i, chunk := range signConditionsSChunks {
+		arr := strings.Split(chunk, " >= ")
+		left := arr[0]
+
+		_, xIndex := parseX(left)
+
+		operandsLeft := matrix.ShellV(int(xIndex) + 1)
+		operandsLeft[xIndex] = 1
+
+		cond := ConditionZero{
+			operandsLeft,
+			OperatorGreaterOrEqual,
+		}
+
+		signConditions[i] = cond
+	}
+
+	// parsing target function
+	targetFunctionSChunks1 := strings.Split(targetFunctionS, " -> ")
+	targetFunctionSChunks2 := strings.Split(targetFunctionSChunks1[0], " = ")
+
+	targetFunctionCoeffsS := strings.Split(targetFunctionSChunks2[1], " ")
+	coeffs := parseXes(targetFunctionCoeffsS)
+
+	var bound Bound
+	if targetFunctionSChunks1[1] == "(max)" {
+		bound = BoundMax
+	} else {
+		bound = BoundMin
+	}
+
+	targetFunction := TargetFunction{
+		coeffs,
+		bound,
+	}
+
+	l := LPT{
+		limitations:    limitations,
+		signConditions: signConditions,
+		targetFunction: targetFunction,
+	}
+
+	return l
 }
