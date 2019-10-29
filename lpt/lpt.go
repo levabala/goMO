@@ -171,7 +171,7 @@ func CanonicalForm(task LPT) CLPT {
 	}
 
 	// III. Emulate positiviness condition for unlimited variables
-	limitedVector := make([]int, len(signConditions))
+	limitedVector := make([]int, maxXIndex+1)
 	for _, cond := range signConditions {
 		xIndex := -1
 		for i, v := range cond.operandsLeft {
@@ -185,14 +185,51 @@ func CanonicalForm(task LPT) CLPT {
 	}
 
 	// erm, it's so many codelines in golang to just invert vector's values! disappointing..
-	unlimitedVector := make([]int, len(limitedVector))
+	unlimitedVector := make([]bool, len(limitedVector))
 	for i, v := range limitedVector {
-		if v == 0 {
-			unlimitedVector[i] = 1
+		unlimitedVector[i] = v == 0
+	}
+
+	// no we need to set to 0 each unlimited X and then add X' and X'' with same pre-coeff
+	for _, lim := range limitations {
+		for i, isUnLimited := range unlimitedVector {
+			if isUnLimited {
+				// take X pre-coeff
+				coeff := lim.operandsLeft[i]
+
+				// remove X
+				lim.operandsLeft[i] = 0
+
+				// append X' and X''
+				lim.operandsLeft = append(append(lim.operandsLeft, coeff), coeff)
+
+				// X' condition
+				condX1V := matrix.ShellV(maxXIndex + 2)
+				condX1V[maxXIndex+1] = 1
+
+				condX1 := ConditionZeroPositive{
+					condX1V,
+				}
+
+				// X'' condition
+				condX2V := matrix.ShellV(maxXIndex + 3)
+				condX2V[maxXIndex+2] = 1
+
+				condX2 := ConditionZeroPositive{
+					condX2V,
+				}
+
+				// append X' and X'' to sign condtions list
+				signConditions = append(append(signConditions, condX1), condX2)
+			}
 		}
 	}
 
-	return CLPT{}
+	return CLPT{
+		limitations:    limitations,
+		signConditions: signConditions,
+		targetFunction: target,
+	}
 }
 
 func parseX(str string) (int, int) {
