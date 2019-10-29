@@ -1,8 +1,7 @@
 package matrix
 
 import (
-	"math"
-	"strconv"
+	"fmt"
 )
 
 // Vector is just 1d array of float64
@@ -245,7 +244,7 @@ func (m Matrix) ToString() string {
 	s := ""
 	for _, row := range m {
 		for _, element := range row {
-			s += strconv.FormatFloat(element, 'f', 1, 64) + " "
+			s += fmt.Sprintf("%5.1f", element) + " "
 		}
 		s += "\n"
 	}
@@ -304,50 +303,93 @@ func (m Matrix) GetLastColumn() Vector {
 
 // OriginalBaseVector returns original base vector
 func (m Matrix) OriginalBaseVector() Matrix {
-	w := Width(m)
+	w, h := Size(m)
+	mg := m.Gauss()
 
-	mr := m.Gauss()
-	B := mr.GetLastColumn()
+	for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
+			mr := mg.BaseVector(y, x)
+			B := mr.GetLastColumn()
 
-	minBIndex := -1
-	minBValue := 0.0
-	for i, b := range B {
-		if b <= 0 && minBValue > b {
-			minBValue = b
-			minBIndex = i
+			everyPositive := true
+			for _, b := range B {
+				everyPositive = everyPositive && b > 0
+			}
+
+			if everyPositive {
+				return mr
+			}
 		}
 	}
 
-	for y, row := range mr {
-		if row[w-1] < 0 {
-			mr = SubstractRow(mr, minBIndex, y, 1)
-		}
-	}
-
-	mr = MultiplyRow(mr, minBIndex, -1)
-
-	pivotColumnIndex := -1
-	for x, a := range mr[minBIndex] {
-		if a > 0 {
-			pivotColumnIndex = x
-			break
-		}
-	}
-
-	pivotRowIndex := -1
-	pivotValue := math.MaxFloat64
-	for y, row := range mr {
-		val := row[w-1] / row[pivotColumnIndex]
-
-		if val < pivotValue {
-			pivotValue = val
-			pivotRowIndex = y
-		}
-	}
-
-	mr = mr.BaseVector(pivotRowIndex, pivotColumnIndex)
-
-	println(mr.ToString())
-
-	return mr
+	return mg
 }
+
+// OriginalBaseVector returns original base vector
+// func (m Matrix) OriginalBaseVector() Matrix {
+// 	w := Width(m)
+
+// 	println("start")
+// 	println(m.ToString())
+
+// 	mr := m.Gauss()
+// 	println("after gauss")
+// 	println(mr.ToString())
+
+// 	for i := 0; i < 3; i++ {
+// 		B := mr.GetLastColumn()
+
+// 		minBIndex := -1
+// 		minBValue := 0.0
+// 		for i, b := range B {
+// 			if b <= 0 && minBValue > b {
+// 				minBValue = b
+// 				minBIndex = i
+// 			}
+// 		}
+
+// 		fmt.Printf("working with row %d\n", minBIndex)
+
+// 		// for y, row := range mr {
+// 		// 	if row[w-1] < 0 && y != minBIndex {
+// 		// 		mr = SubstractRow(mr, minBIndex, y, 1)
+// 		// 	}
+// 		// }
+
+// 		println("after substrtact")
+// 		println(mr.ToString())
+
+// 		mr = MultiplyRow(mr, minBIndex, -1)
+
+// 		println("after mutliply -1")
+// 		println(mr.ToString())
+
+// 		pivotColumnIndex := -1
+// 		for x, a := range mr[minBIndex] {
+// 			if a > 0 {
+// 				pivotColumnIndex = x
+// 				break
+// 			}
+// 		}
+
+// 		pivotRowIndex := -1
+// 		pivotValue := math.MaxFloat64
+// 		for y, row := range mr {
+// 			val := row[w-1] / row[pivotColumnIndex]
+
+// 			if val < pivotValue {
+// 				pivotValue = val
+// 				pivotRowIndex = y
+// 			}
+// 		}
+
+// 		println("pre-baseVector")
+// 		println(mr.ToString())
+
+// 		mr = mr.BaseVector(pivotRowIndex, pivotColumnIndex)
+
+// 		println("result")
+// 		println(mr.ToString())
+// 	}
+// 	return mr
+// }

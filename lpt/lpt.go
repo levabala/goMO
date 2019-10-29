@@ -97,10 +97,10 @@ func CanonicalForm(task LPT) CLPT {
 	maxXIndexAtStart := maxXIndex
 
 	// I. Minimize target function
-	coeffs := task.targetFunction.coeffs
+	targetFunctionCoeffs := task.targetFunction.coeffs
 
 	if task.targetFunction.bound == BoundMax {
-		coeffs = coeffs.MultiplyWithNumber(-1)
+		targetFunctionCoeffs = targetFunctionCoeffs.MultiplyWithNumber(-1)
 	}
 
 	// II. Map all operators to Equal by adding new x-es (also appending new x-es to singConditions)
@@ -112,7 +112,7 @@ func CanonicalForm(task LPT) CLPT {
 		operandRight := lim.operandRight
 		if lim.operator != OperatorEqual {
 			maxXIndex++
-			newOperandsLeft := matrix.ShellV(maxXIndex)
+			newOperandsLeft := matrix.ShellV(maxXIndex + 1)
 
 			// fill with already existing x-es
 			for i, x := range operandsLeft {
@@ -126,7 +126,7 @@ func CanonicalForm(task LPT) CLPT {
 				x = -1
 			}
 
-			newOperandsLeft[maxXIndex-1] = x
+			newOperandsLeft[maxXIndex] = x
 			operandsLeft = newOperandsLeft
 		}
 
@@ -138,7 +138,7 @@ func CanonicalForm(task LPT) CLPT {
 
 	// make every condition's operandsLeft Vector length equal
 	for i, lim := range limitations {
-		newOperandsLeft := matrix.ShellV(maxXIndex)
+		newOperandsLeft := matrix.ShellV(maxXIndex + 1)
 		for i, x := range lim.operandsLeft {
 			newOperandsLeft[i] = x
 		}
@@ -191,9 +191,35 @@ func CanonicalForm(task LPT) CLPT {
 	}
 
 	// no we need to set to 0 each unlimited X and then add X' and X'' with same pre-coeff
-	for _, lim := range limitations {
-		for i, isUnLimited := range unlimitedVector {
-			if isUnLimited {
+	for i, isUnLimited := range unlimitedVector {
+		if isUnLimited {
+			// remove coeffs from targetFunction
+			targetFunctionCoeffs[i] = 0
+
+			// append X' and X'' to targetFunction
+			targetFunctionCoeffs = append(targetFunctionCoeffs, 1, -1)
+
+			// X' condition
+			condX1V := matrix.ShellV(maxXIndex + 2)
+			condX1V[maxXIndex+1] = 1
+
+			condX1 := ConditionZeroPositive{
+				condX1V,
+			}
+
+			// X'' condition
+			condX2V := matrix.ShellV(maxXIndex + 3)
+			condX2V[maxXIndex+2] = -1
+
+			condX2 := ConditionZeroPositive{
+				condX2V,
+			}
+
+			// append X' and X'' to sign condtions list
+			signConditions = append(signConditions, condX1, condX2)
+
+			// process limitations
+			for i2, lim := range limitations {
 				// take X pre-coeff
 				coeff := lim.operandsLeft[i]
 
@@ -201,34 +227,22 @@ func CanonicalForm(task LPT) CLPT {
 				lim.operandsLeft[i] = 0
 
 				// append X' and X''
-				lim.operandsLeft = append(append(lim.operandsLeft, coeff), coeff)
+				lim.operandsLeft = append(lim.operandsLeft, coeff, coeff)
 
-				// X' condition
-				condX1V := matrix.ShellV(maxXIndex + 2)
-				condX1V[maxXIndex+1] = 1
-
-				condX1 := ConditionZeroPositive{
-					condX1V,
-				}
-
-				// X'' condition
-				condX2V := matrix.ShellV(maxXIndex + 3)
-				condX2V[maxXIndex+2] = 1
-
-				condX2 := ConditionZeroPositive{
-					condX2V,
-				}
-
-				// append X' and X'' to sign condtions list
-				signConditions = append(append(signConditions, condX1), condX2)
+				// write to limitations
+				limitations[i2] = lim
 			}
 		}
+	}
+
+	targetFunction := TargetFunctionMin{
+		targetFunctionCoeffs,
 	}
 
 	return CLPT{
 		limitations:    limitations,
 		signConditions: signConditions,
-		targetFunction: target,
+		targetFunction: targetFunction,
 	}
 }
 
@@ -266,6 +280,8 @@ func ParseLPT(lines []string) LPT {
 	limitationsS := lines[:linesCount-2]
 	signConditionsS := lines[linesCount-2]
 	targetFunctionS := lines[linesCount-1]
+
+	maxXIndex := -1
 
 	// parsing limitations
 	limitations := make([]Condition, len(limitationsS))
@@ -309,7 +325,21 @@ func ParseLPT(lines []string) LPT {
 			operandRight,
 		}
 
+		if len(operandsLeft) > maxXIndex {
+			maxXIndex = len(operandsLeft) - 1
+		}
+
 		limitations[i] = cond
+	}
+
+	// make every condition's operandsLeft Vector length equal
+	for i, lim := range limitations {
+		newOperandsLeft := matrix.ShellV(maxXIndex + 1)
+		for i, x := range lim.operandsLeft {
+			newOperandsLeft[i] = x
+		}
+
+		limitations[i].operandsLeft = newOperandsLeft
 	}
 
 	// parsing signs
