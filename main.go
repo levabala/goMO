@@ -9,6 +9,6 @@ func main() {
 		{1, -1, 2, 0},
 	}
 
-	mg := matrix.Gauss(m)
+	mg := m.OriginalBaseVector()
 	println(mg.ToString())
 }

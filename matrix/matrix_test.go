@@ -269,3 +269,33 @@ func Test_multiply(t *testing.T) {
 		})
 	}
 }
+
+func TestGauss(t *testing.T) {
+	type args struct {
+		m Matrix
+	}
+	tests := []struct {
+		name string
+		args args
+		want Matrix
+	}{
+		{"test1", args{
+			Matrix{
+				{1, -2, 1, 1},
+				{2, 3, -1, -1},
+				{1, -1, 2, 0},
+			}},
+			Matrix{
+				{1.0, 0, 0, 0.20000000000000007},
+				{0, 1, 0, -3.0 / 5},
+				{0, 0, 1, -0.39999999999999997},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.args.m.Gauss(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Gauss() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -1,6 +1,9 @@
 package matrix
 
-import "strconv"
+import (
+	"math"
+	"strconv"
+)
 
 // Vector is just 1d array of float64
 type Vector []float64
@@ -237,25 +240,6 @@ func minInt(i1, i2 int) int {
 	return i2
 }
 
-// Gauss makes gauss transform with the Matrix
-func Gauss(m Matrix) Matrix {
-	width, height := Size(m)
-	minSide := minInt(width, height)
-
-	mr := m
-	for i := 0; i < minSide; i++ {
-		currentRow := mr[i]
-		referenceElement := currentRow[i]
-		mr = DivideRow(m, i, referenceElement)
-
-		for y := i + 1; y < height; y++ {
-			mr = SubstractRow(mr, i, y, mr[y][i])
-		}
-	}
-
-	return mr
-}
-
 // ToString converts Matrix to string
 func (m Matrix) ToString() string {
 	s := ""
@@ -266,4 +250,104 @@ func (m Matrix) ToString() string {
 		s += "\n"
 	}
 	return s
+}
+
+// BaseVector creates a base vector at provided column with 1 at provided row
+func (m Matrix) BaseVector(rowIndex, columnIndex int) Matrix {
+	mr := DivideRow(m, rowIndex, m[rowIndex][columnIndex])
+	for y, row := range m {
+		if y != rowIndex {
+			mr = SubstractRow(mr, rowIndex, y, row[columnIndex])
+		}
+	}
+
+	return mr
+}
+
+// Gauss makes gauss transform with the Matrix
+func (m Matrix) Gauss() Matrix {
+	width, height := Size(m)
+	minSide := minInt(width, height)
+
+	mr := m
+	for i := 0; i < minSide; i++ {
+		mr = mr.BaseVector(i, i)
+	}
+
+	return mr
+}
+
+// GetColumn returns column vector at index i
+func (m Matrix) GetColumn(i int) Vector {
+	v := ShellV(Height(m))
+	for y, row := range m {
+		v[y] = row[i]
+	}
+
+	return v
+}
+
+// GetLastColumn returns last column
+func (m Matrix) GetLastColumn() Vector {
+	v := ShellV(Height(m))
+	i := Width(m) - 1
+	for y, row := range m {
+		v[y] = row[i]
+	}
+
+	return v
+}
+
+// func (m Matrix) AllBasicSolutions() Matrix {
+
+// }
+
+// OriginalBaseVector returns original base vector
+func (m Matrix) OriginalBaseVector() Matrix {
+	w := Width(m)
+
+	mr := m.Gauss()
+	B := mr.GetLastColumn()
+
+	minBIndex := -1
+	minBValue := 0.0
+	for i, b := range B {
+		if b <= 0 && minBValue > b {
+			minBValue = b
+			minBIndex = i
+		}
+	}
+
+	for y, row := range mr {
+		if row[w-1] < 0 {
+			mr = SubstractRow(mr, minBIndex, y, 1)
+		}
+	}
+
+	mr = MultiplyRow(mr, minBIndex, -1)
+
+	pivotColumnIndex := -1
+	for x, a := range mr[minBIndex] {
+		if a > 0 {
+			pivotColumnIndex = x
+			break
+		}
+	}
+
+	pivotRowIndex := -1
+	pivotValue := math.MaxFloat64
+	for y, row := range mr {
+		val := row[w-1] / row[pivotColumnIndex]
+
+		if val < pivotValue {
+			pivotValue = val
+			pivotRowIndex = y
+		}
+	}
+
+	mr = mr.BaseVector(pivotRowIndex, pivotColumnIndex)
+
+	println(mr.ToString())
+
+	return mr
 }
