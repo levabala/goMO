@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"fmt"
+	"math"
 )
 
 // Vector is just 1d array of float64
@@ -29,7 +30,7 @@ func ShellM(width, height int) Matrix {
 
 // Transpose performce Matrix transposation
 func Transpose(m Matrix) Matrix {
-	w, h := Size(m)
+	w, h := m.Size()
 	m2 := ShellM(h, w)
 
 	for y := 0; y < h; y++ {
@@ -42,18 +43,18 @@ func Transpose(m Matrix) Matrix {
 }
 
 // Width returns the width of the Matrix
-func Width(m Matrix) int {
+func (m Matrix) Width() int {
 	return len(m[0])
 }
 
 // Height returns the Height of the Matrix
-func Height(m Matrix) int {
+func (m Matrix) Height() int {
 	return len(m)
 }
 
 // Size returns (width, height) of the Matrix
-func Size(m Matrix) (int, int) {
-	return Width(m), Height(m)
+func (m Matrix) Size() (int, int) {
+	return m.Width(), m.Height()
 }
 
 // SumV sums every Vector's value
@@ -68,7 +69,7 @@ func SumV(v Vector) float64 {
 
 // Add adds Matrixes element by element
 func Add(m1, m2 Matrix) Matrix {
-	w, h := Size(m1)
+	w, h := m1.Size()
 	m := ShellM(w, h)
 
 	for y := 0; y < h; y++ {
@@ -82,7 +83,7 @@ func Add(m1, m2 Matrix) Matrix {
 
 // Substract substracts Matrixes element by element
 func Substract(m1, m2 Matrix) Matrix {
-	w, h := Size(m1)
+	w, h := m1.Size()
 	m := make(Matrix, h)
 
 	for y := range m {
@@ -98,7 +99,7 @@ func Substract(m1, m2 Matrix) Matrix {
 
 // MultiplyWithNumber multiplies each Matrix's element by value
 func (m Matrix) MultiplyWithNumber(value float64) Matrix {
-	mr := ShellM(Size(m))
+	mr := ShellM(m.Size())
 
 	for y, row := range m {
 		for x, element := range row {
@@ -133,8 +134,8 @@ func MultiplyElementByElement(v1, v2 Vector) Vector {
 
 // Multiply does just Matrixes multiplying
 func Multiply(m1, m2 Matrix) Matrix {
-	h1 := Height(m1)
-	w2 := Width(m2)
+	h1 := m1.Height()
+	w2 := m2.Width()
 
 	mr := ShellM(w2, h1)
 	m2Columns := Transpose(m2)
@@ -151,7 +152,7 @@ func Multiply(m1, m2 Matrix) Matrix {
 
 // MultiplyRow multiplies each row's element by value
 func MultiplyRow(m Matrix, rowIndex int, value float64) Matrix {
-	w, h := Size(m)
+	w, h := m.Size()
 	mr := ShellM(w, h)
 
 	for y := 0; y < h; y++ {
@@ -169,7 +170,7 @@ func MultiplyRow(m Matrix, rowIndex int, value float64) Matrix {
 
 // DivideRow divides each row's element by value
 func DivideRow(m Matrix, rowIndex int, value float64) Matrix {
-	w, h := Size(m)
+	w, h := m.Size()
 	mr := ShellM(w, h)
 
 	for y := 0; y < h; y++ {
@@ -187,7 +188,7 @@ func DivideRow(m Matrix, rowIndex int, value float64) Matrix {
 
 // SubstractRow substracts rowIndexWhich values mutliplied by multiplier from rowIndexFrom
 func SubstractRow(m Matrix, rowIndexWhich int, rowIndexFrom int, multiplier float64) Matrix {
-	w, h := Size(m)
+	w, h := m.Size()
 	mr := ShellM(w, h)
 
 	rowMultiplied := m[rowIndexWhich].Clone().MultiplyWithNumber(multiplier)
@@ -207,7 +208,7 @@ func SubstractRow(m Matrix, rowIndexWhich int, rowIndexFrom int, multiplier floa
 
 // Clone clones the Matrix
 func (m Matrix) Clone() Matrix {
-	w, h := Size(m)
+	w, h := m.Size()
 	mr := ShellM(w, h)
 
 	for y := 0; y < h; y++ {
@@ -265,12 +266,18 @@ func (m Matrix) BaseVector(rowIndex, columnIndex int) Matrix {
 
 // Gauss makes gauss transform with the Matrix
 func (m Matrix) Gauss() Matrix {
-	width, height := Size(m)
-	minSide := minInt(width, height)
+	width, height := m.Size()
 
 	mr := m
-	for i := 0; i < minSide; i++ {
-		mr = mr.BaseVector(i, i)
+	usedColumns := ShellV(width)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if usedColumns[x] == 0 && mr[y][x] != 0 {
+				mr = mr.BaseVector(y, x)
+				usedColumns[x] = 1
+				break
+			}
+		}
 	}
 
 	return mr
@@ -278,7 +285,7 @@ func (m Matrix) Gauss() Matrix {
 
 // GetColumn returns column vector at index i
 func (m Matrix) GetColumn(i int) Vector {
-	v := ShellV(Height(m))
+	v := ShellV(m.Height())
 	for y, row := range m {
 		v[y] = row[i]
 	}
@@ -288,8 +295,8 @@ func (m Matrix) GetColumn(i int) Vector {
 
 // GetLastColumn returns last column
 func (m Matrix) GetLastColumn() Vector {
-	v := ShellV(Height(m))
-	i := Width(m) - 1
+	v := ShellV(m.Height())
+	i := m.Width() - 1
 	for y, row := range m {
 		v[y] = row[i]
 	}
@@ -302,94 +309,184 @@ func (m Matrix) GetLastColumn() Vector {
 // }
 
 // OriginalBaseVector returns original base vector
-func (m Matrix) OriginalBaseVector() Matrix {
-	w, h := Size(m)
-	mg := m.Gauss()
-
-	for x := 0; x < w; x++ {
-		for y := 0; y < h; y++ {
-			mr := mg.BaseVector(y, x)
-			B := mr.GetLastColumn()
-
-			everyPositive := true
-			for _, b := range B {
-				everyPositive = everyPositive && b > 0
-			}
-
-			if everyPositive {
-				return mr
-			}
-		}
-	}
-
-	return mg
-}
-
-// OriginalBaseVector returns original base vector
 // func (m Matrix) OriginalBaseVector() Matrix {
-// 	w := Width(m)
+// 	w, h := m.Size()
+// 	mg := m.Gauss()
 
-// 	println("start")
-// 	println(m.ToString())
+// 	for x := 0; x < w-1; x++ {
+// 		for y := 0; y < h; y++ {
+// 			mr := mg.BaseVector(y, x)
+// 			B := mr.GetLastColumn()
 
-// 	mr := m.Gauss()
-// 	println("after gauss")
-// 	println(mr.ToString())
+// 			everyPositive := true
+// 			for _, b := range B {
+// 				everyPositive = everyPositive && b >= 0
+// 			}
 
-// 	for i := 0; i < 3; i++ {
+// 			if everyPositive {
+// 				return mr
+// 			}
+// 		}
+// 	}
+
+// 	return mg
+// }
+
+// // OriginalBaseVectorRandom returns original base vector
+// func (m Matrix) originalBaseVectorRandomInner(c chan int) Matrix {
+// 	w, h := m.Size()
+// 	mg := m.Gauss()
+// 	mr := mg
+
+// 	i := 0
+// 	i2 := 0
+// 	i3 := 0
+// 	for {
+// 		x := rand.Intn(w - 1)
+// 		y := rand.Intn(h)
+// 		mr = mg.BaseVector(y, x)
 // 		B := mr.GetLastColumn()
 
-// 		minBIndex := -1
-// 		minBValue := 0.0
-// 		for i, b := range B {
-// 			if b <= 0 && minBValue > b {
-// 				minBValue = b
-// 				minBIndex = i
+// 		everyPositive := true
+// 		for _, b := range B {
+// 			everyPositive = everyPositive && b >= 0
+// 		}
+
+// 		i++
+// 		i2++
+// 		i3++
+// 		if i%10e3 == 0 {
+// 			c <- i
+// 			i = 0
+// 		}
+
+// 		if i2%10e4 == 0 {
+// 			println(mr.ToString())
+// 		}
+
+// 		if i3%10e5 == 0 {
+// 			mg = m.BaseVector(y, x).Gauss()
+// 			if math.IsNaN(mg[0][0]) {
+// 				mg = m.Gauss()
 // 			}
 // 		}
 
-// 		fmt.Printf("working with row %d\n", minBIndex)
-
-// 		// for y, row := range mr {
-// 		// 	if row[w-1] < 0 && y != minBIndex {
-// 		// 		mr = SubstractRow(mr, minBIndex, y, 1)
-// 		// 	}
-// 		// }
-
-// 		println("after substrtact")
-// 		println(mr.ToString())
-
-// 		mr = MultiplyRow(mr, minBIndex, -1)
-
-// 		println("after mutliply -1")
-// 		println(mr.ToString())
-
-// 		pivotColumnIndex := -1
-// 		for x, a := range mr[minBIndex] {
-// 			if a > 0 {
-// 				pivotColumnIndex = x
-// 				break
-// 			}
+// 		if everyPositive {
+// 			println(mr.ToString())
+// 			return mr
 // 		}
-
-// 		pivotRowIndex := -1
-// 		pivotValue := math.MaxFloat64
-// 		for y, row := range mr {
-// 			val := row[w-1] / row[pivotColumnIndex]
-
-// 			if val < pivotValue {
-// 				pivotValue = val
-// 				pivotRowIndex = y
-// 			}
-// 		}
-
-// 		println("pre-baseVector")
-// 		println(mr.ToString())
-
-// 		mr = mr.BaseVector(pivotRowIndex, pivotColumnIndex)
-
-// 		println("result")
-// 		println(mr.ToString())
 // 	}
-// 	return mr
 // }
+
+// func (m Matrix) OriginalBaseVectorRandom() Matrix {
+// 	c := make(chan int)
+
+// 	for x := 0; x < 1; x++ {
+// 		go m.Clone().originalBaseVectorRandomInner(c)
+// 	}
+
+// 	totalI := 0
+// 	for i := range c {
+// 		totalI += i
+// 		fmt.Println(totalI)
+// 	}
+
+// 	return m
+// }
+
+// func Infinite() {
+// 	i := 0
+// 	for {
+// 		i++
+// 		if i%10e7 == 0 {
+// 			fmt.Println(i)
+// 		}
+// 	}
+// }
+
+// OriginalBaseVector returns original base vector
+func (m Matrix) OriginalBaseVector() Matrix {
+	w := m.Width()
+
+	println("start")
+	println(m.ToString())
+
+	mr := m.Gauss()
+	println("after gauss")
+	println(mr.ToString())
+
+	i := 0
+	for {
+
+		B := mr.GetLastColumn()
+
+		minBIndex := -1
+		minBValue := 0.0
+		for i, b := range B {
+			if b <= 0 && minBValue > b {
+				minBValue = b
+				minBIndex = i
+			}
+		}
+
+		fmt.Printf("working with row %d\n", minBIndex)
+
+		for y, row := range mr {
+			if row[w-1] < 0 && y != minBIndex {
+				mr = SubstractRow(mr, minBIndex, y, 1)
+			}
+		}
+
+		println("after substrtact")
+		println(mr.ToString())
+
+		mr = MultiplyRow(mr, minBIndex, -1)
+
+		println("after mutliply -1")
+		println(mr.ToString())
+
+		pivotColumnIndex := -1
+		for x, a := range mr[minBIndex] {
+			if a > 0 && x < w-1 {
+				pivotColumnIndex = x
+				break
+			}
+		}
+
+		pivotRowIndex := -1
+		pivotValue := math.MaxFloat64
+		for y, row := range mr {
+			val := row[w-1] / row[pivotColumnIndex]
+
+			if val >= 0 && val < pivotValue && (row[pivotColumnIndex] <= 0 || y == minBIndex) {
+				pivotValue = val
+				pivotRowIndex = y
+			}
+		}
+
+		i++
+
+		// fmt.Printf()
+		// println("pre-baseVector")
+		// println(mr.ToString())
+
+		fmt.Printf("pivot at x: %d, y: %d\n", pivotColumnIndex, pivotRowIndex)
+		mr = mr.BaseVector(pivotRowIndex, pivotColumnIndex)
+
+		println("after base vector")
+		println(mr.ToString())
+
+		B = mr.GetLastColumn()
+		everyIsPositive := true
+		for _, b := range B {
+			everyIsPositive = everyIsPositive && b > 0
+		}
+
+		if everyIsPositive {
+			println("success")
+			break
+		}
+		println("still not every b > 0")
+	}
+	return mr
+}

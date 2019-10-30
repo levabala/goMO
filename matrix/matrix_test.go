@@ -80,7 +80,7 @@ func Test_width(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Width(tt.args.m); got != tt.want {
+			if got := tt.args.m.Width(); got != tt.want {
 				t.Errorf("width() = %v, want %v", got, tt.want)
 			}
 		})
@@ -100,7 +100,7 @@ func Test_height(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Height(tt.args.m); got != tt.want {
+			if got := tt.args.m.Height(); got != tt.want {
 				t.Errorf("height() = %v, want %v", got, tt.want)
 			}
 		})
@@ -121,7 +121,7 @@ func Test_size(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := Size(tt.args.m)
+			got, got1 := tt.args.m.Size()
 			if got != tt.want {
 				t.Errorf("size() got = %v, want %v", got, tt.want)
 			}

@@ -1,6 +1,7 @@
 package lpt
 
 import (
+	"fmt"
 	"gomo/matrix"
 	"strconv"
 	"strings"
@@ -389,4 +390,60 @@ func ParseLPT(lines []string) LPT {
 	}
 
 	return l
+}
+
+// LimitationsAsMatrix returns tasks' limitations in Matrix form
+func (task CLPT) LimitationsAsMatrix() matrix.Matrix {
+	m := matrix.ShellM(len(task.limitations[0].operandsLeft)+1, len(task.limitations))
+
+	for i, lim := range task.limitations {
+		for x, value := range lim.operandsLeft {
+			// place x-es
+			m[i][x] = value
+		}
+
+		// place b also
+		m[i][len(lim.operandsLeft)] = lim.operandRight
+	}
+
+	return m
+}
+
+// func (task CLPT) SetMatrix(m matrix.Matrix) CLPT {
+// 	limitations := make([]ConditionEqual, len(task.limitations))
+// }
+
+// DoSimplex performs Simplex transformation
+func DoSimplex(task CLPT) CLPT {
+	m := task.LimitationsAsMatrix()
+	_, h := m.Size()
+
+	baseVector := make([]float64, h)
+
+	columns := matrix.Transpose(m)
+	for x, column := range columns {
+		zerosCount := 0
+		onesCount := 0
+		onePosition := -1
+		for y, el := range column {
+			if el == 0.0 {
+				zerosCount++
+			} else if el == 1.0 {
+				onesCount++
+				onePosition = y
+			}
+		}
+
+		isBase := onesCount == 1 && zerosCount == h-1
+		if isBase {
+			baseVector[onePosition] = task.targetFunction.coeffs[x]
+		}
+	}
+
+	B := m.GetLastColumn()
+	totalZ := matrix.SumV(matrix.MultiplyElementByElement(B, baseVector))
+
+	fmt.Printf("%f\n", totalZ)
+
+	return task
 }
