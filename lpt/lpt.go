@@ -3,6 +3,7 @@ package lpt
 import (
 	"fmt"
 	"gomo/matrix"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -236,8 +237,13 @@ func CanonicalForm(task LPT) CLPT {
 		}
 	}
 
+	targetFunctionCoeffsWithLength := make(matrix.Vector, len(limitations[0].operandsLeft)+1)
+	for i, v := range targetFunctionCoeffs {
+		targetFunctionCoeffsWithLength[i] = v
+	}
+
 	targetFunction := TargetFunctionMin{
-		targetFunctionCoeffs,
+		targetFunctionCoeffsWithLength,
 	}
 
 	return CLPT{
@@ -370,6 +376,11 @@ func ParseLPT(lines []string) LPT {
 
 	targetFunctionCoeffsS := strings.Split(targetFunctionSChunks2[1], " ")
 	coeffs := parseXes(targetFunctionCoeffsS)
+	coeffsWithLength := make(matrix.Vector, maxXIndex+1)
+
+	for i, v := range coeffs {
+		coeffsWithLength[i] = v
+	}
 
 	var bound Bound
 	if targetFunctionSChunks1[1] == "(max)" {
@@ -379,7 +390,7 @@ func ParseLPT(lines []string) LPT {
 	}
 
 	targetFunction := TargetFunction{
-		coeffs,
+		coeffsWithLength,
 		bound,
 	}
 
@@ -409,14 +420,31 @@ func (task CLPT) LimitationsAsMatrix() matrix.Matrix {
 	return m
 }
 
-// func (task CLPT) SetMatrix(m matrix.Matrix) CLPT {
-// 	limitations := make([]ConditionEqual, len(task.limitations))
-// }
+// SetMatrix sets limitations for a CLPT
+func (task CLPT) SetMatrix(m matrix.Matrix) CLPT {
+	limitations := make([]ConditionEqual, len(task.limitations))
+
+	for y, row := range m {
+		lastIndex := len(row) - 1
+		limitations[y] = ConditionEqual{
+			operandsLeft: row[:lastIndex],
+			operandRight: row[lastIndex],
+		}
+	}
+
+	return CLPT{
+		limitations:    limitations,
+		signConditions: task.signConditions,
+		targetFunction: task.targetFunction,
+	}
+}
 
 // DoSimplex performs Simplex transformation
-func DoSimplex(task CLPT) CLPT {
+func (task CLPT) DoSimplex() CLPT {
+	println("\nAnother one Simplex iteration")
+
 	m := task.LimitationsAsMatrix()
-	_, h := m.Size()
+	w, h := m.Size()
 
 	baseVector := make([]float64, h)
 
@@ -440,10 +468,48 @@ func DoSimplex(task CLPT) CLPT {
 		}
 	}
 
+	calcZ := func(i int) float64 {
+		return matrix.SumV(matrix.MultiplyElementByElement(columns[i], baseVector)) - task.targetFunction.coeffs[i]
+	}
+
 	B := m.GetLastColumn()
-	totalZ := matrix.SumV(matrix.MultiplyElementByElement(B, baseVector))
 
-	fmt.Printf("%f\n", totalZ)
+	zValues := matrix.ShellV(len(columns))
+	zCoeffs := matrix.ShellM(m.Size())
+	minValueX := -1
+	minValueY := -1
+	minValue := math.MaxFloat64
+	for x, column := range columns {
+		z := calcZ(x)
+		zValues[x] = z
 
-	return task
+		if z > 0 && x < w-1 {
+			for y, el := range column {
+				if el > 0 {
+					c := B[y] / el
+					zCoeffs[y][x] = c
+
+					if c < minValue {
+						minValueX = x
+						minValueY = y
+						minValue = c
+					}
+				}
+			}
+		}
+	}
+
+	println(zCoeffs.ToString())
+	println(zValues.ToString())
+
+	if minValueX == -1 {
+		return task
+	}
+
+	fmt.Printf("%d %d %f\n", minValueX, minValueY, minValue)
+
+	newMatrix := m.BaseVector(minValueY, minValueX)
+	newTask := task.SetMatrix(newMatrix)
+
+	return newTask.DoSimplex()
 }

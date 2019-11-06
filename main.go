@@ -59,8 +59,12 @@ import (
 // 	l := lpt.ParseLPT(strings.Split(input, "\n")[1:])
 // 	lc := lpt.CanonicalForm(l)
 
-// 	m := lc.LimitationsToMatrix().OriginalBaseVector()
+// 	m := lc.LimitationsAsMatrix().OriginalBaseVector()
 // 	println(m.ToString())
+
+// 	lcc := lc.SetMatrix(m)
+
+// 	lcc.DoSimplex()
 // }
 
 func main() {
@@ -81,4 +85,7 @@ Z = 19x1 +12x2 +15x3 +14x4 +15x5 +16x6 +13x7 +11x8 +21x9 +13x10 +12x11 +17x12 ->
 	m := lc.LimitationsAsMatrix().OriginalBaseVector()
 	println(m.ToString())
 
+	lcc := lc.SetMatrix(m)
+
+	lcc.DoSimplex()
 }

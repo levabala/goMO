@@ -244,10 +244,17 @@ func minInt(i1, i2 int) int {
 func (m Matrix) ToString() string {
 	s := ""
 	for _, row := range m {
-		for _, element := range row {
-			s += fmt.Sprintf("%5.1f", element) + " "
-		}
+		s += row.ToString()
 		s += "\n"
+	}
+	return s
+}
+
+// ToString converts Vector to string
+func (v Vector) ToString() string {
+	s := ""
+	for _, element := range v {
+		s += fmt.Sprintf("%5.1f", element) + " "
 	}
 	return s
 }
@@ -303,106 +310,6 @@ func (m Matrix) GetLastColumn() Vector {
 
 	return v
 }
-
-// func (m Matrix) AllBasicSolutions() Matrix {
-
-// }
-
-// OriginalBaseVector returns original base vector
-// func (m Matrix) OriginalBaseVector() Matrix {
-// 	w, h := m.Size()
-// 	mg := m.Gauss()
-
-// 	for x := 0; x < w-1; x++ {
-// 		for y := 0; y < h; y++ {
-// 			mr := mg.BaseVector(y, x)
-// 			B := mr.GetLastColumn()
-
-// 			everyPositive := true
-// 			for _, b := range B {
-// 				everyPositive = everyPositive && b >= 0
-// 			}
-
-// 			if everyPositive {
-// 				return mr
-// 			}
-// 		}
-// 	}
-
-// 	return mg
-// }
-
-// // OriginalBaseVectorRandom returns original base vector
-// func (m Matrix) originalBaseVectorRandomInner(c chan int) Matrix {
-// 	w, h := m.Size()
-// 	mg := m.Gauss()
-// 	mr := mg
-
-// 	i := 0
-// 	i2 := 0
-// 	i3 := 0
-// 	for {
-// 		x := rand.Intn(w - 1)
-// 		y := rand.Intn(h)
-// 		mr = mg.BaseVector(y, x)
-// 		B := mr.GetLastColumn()
-
-// 		everyPositive := true
-// 		for _, b := range B {
-// 			everyPositive = everyPositive && b >= 0
-// 		}
-
-// 		i++
-// 		i2++
-// 		i3++
-// 		if i%10e3 == 0 {
-// 			c <- i
-// 			i = 0
-// 		}
-
-// 		if i2%10e4 == 0 {
-// 			println(mr.ToString())
-// 		}
-
-// 		if i3%10e5 == 0 {
-// 			mg = m.BaseVector(y, x).Gauss()
-// 			if math.IsNaN(mg[0][0]) {
-// 				mg = m.Gauss()
-// 			}
-// 		}
-
-// 		if everyPositive {
-// 			println(mr.ToString())
-// 			return mr
-// 		}
-// 	}
-// }
-
-// func (m Matrix) OriginalBaseVectorRandom() Matrix {
-// 	c := make(chan int)
-
-// 	for x := 0; x < 1; x++ {
-// 		go m.Clone().originalBaseVectorRandomInner(c)
-// 	}
-
-// 	totalI := 0
-// 	for i := range c {
-// 		totalI += i
-// 		fmt.Println(totalI)
-// 	}
-
-// 	return m
-// }
-
-// func Infinite() {
-// 	i := 0
-// 	for {
-// 		i++
-// 		if i%10e7 == 0 {
-// 			fmt.Println(i)
-// 		}
-// 	}
-// }
 
 // OriginalBaseVector returns original base vector
 func (m Matrix) OriginalBaseVector() Matrix {
