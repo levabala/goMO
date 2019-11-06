@@ -499,14 +499,18 @@ func (task CLPT) DoSimplex() CLPT {
 		}
 	}
 
+	println("Matrix of b_i / a_ik")
 	println(zCoeffs.ToString())
+	println("Vector of z-coeffs")
 	println(zValues.ToString())
 
 	if minValueX == -1 {
 		return task
 	}
 
-	fmt.Printf("%d %d %f\n", minValueX, minValueY, minValue)
+	println()
+	println("Gonna find BaseVector at this point")
+	fmt.Printf("x: %d y: %d\n", minValueX, minValueY)
 
 	newMatrix := m.BaseVector(minValueY, minValueX)
 	newTask := task.SetMatrix(newMatrix)
