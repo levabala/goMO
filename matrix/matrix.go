@@ -29,7 +29,7 @@ func ShellM(width, height int) Matrix {
 }
 
 // Transpose performce Matrix transposation
-func Transpose(m Matrix) Matrix {
+func (m Matrix) Transpose() Matrix {
 	w, h := m.Size()
 	m2 := ShellM(h, w)
 
@@ -138,7 +138,7 @@ func Multiply(m1, m2 Matrix) Matrix {
 	w2 := m2.Width()
 
 	mr := ShellM(w2, h1)
-	m2Columns := Transpose(m2)
+	m2Columns := m2.Transpose()
 
 	for y, row := range m1 {
 		for x := 0; x < w2; x++ {

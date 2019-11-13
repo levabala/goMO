@@ -32,6 +32,8 @@ const (
 	OperatorLessOrEqual Operator = iota
 	// OperatorEqual is =
 	OperatorEqual Operator = iota
+	// OperatorNone is None
+	OperatorNone Operator = iota
 )
 
 // TargetFunction is Z
@@ -280,6 +282,57 @@ func parseXes(str []string) matrix.Vector {
 	return v
 }
 
+func operatorFromString(str string) Operator {
+	var operator Operator
+	switch str {
+	case ">=":
+		operator = OperatorGreaterOrEqual
+	case "=":
+		operator = OperatorEqual
+	case "<=":
+		operator = OperatorLessOrEqual
+	case ">":
+		operator = OperatorGreater
+	case "<":
+		operator = OperatorLess
+	}
+
+	return operator
+}
+
+func (operator Operator) ToString() string {
+	switch operator {
+	case OperatorGreaterOrEqual:
+		return ">="
+	case OperatorEqual:
+		return "="
+	case OperatorLessOrEqual:
+		return "<="
+	case OperatorGreater:
+		return ">"
+	case OperatorLess:
+		return "<"
+	}
+
+	return "Undefined"
+}
+
+func (bound Bound) ToString() string {
+	if bound == BoundMax {
+		return "(max)"
+	} else {
+		return "(min)"
+	}
+}
+
+func boundFromString(str string) Bound {
+	if str == "(max)" {
+		return BoundMax
+	} else {
+		return BoundMin
+	}
+}
+
 // ParseLPT parses string array to LPT
 func ParseLPT(lines []string) LPT {
 	linesCount := len(lines)
@@ -299,19 +352,7 @@ func ParseLPT(lines []string) LPT {
 		operandRight, _ := strconv.ParseFloat(chunks[chunksCount-1], 64)
 		operatorS := chunks[chunksCount-2]
 
-		var operator Operator
-		switch operatorS {
-		case ">=":
-			operator = OperatorGreaterOrEqual
-		case "=":
-			operator = OperatorEqual
-		case "<=":
-			operator = OperatorLessOrEqual
-		case ">":
-			operator = OperatorGreater
-		case "<":
-			operator = OperatorLess
-		}
+		operator := operatorFromString(operatorS)
 
 		coeffsS := chunks[1 : chunksCount-2]
 		operandsLeft := matrix.Vector{}
@@ -382,12 +423,7 @@ func ParseLPT(lines []string) LPT {
 		coeffsWithLength[i] = v
 	}
 
-	var bound Bound
-	if targetFunctionSChunks1[1] == "(max)" {
-		bound = BoundMax
-	} else {
-		bound = BoundMin
-	}
+	bound := boundFromString(targetFunctionSChunks1[1])
 
 	targetFunction := TargetFunction{
 		coeffsWithLength,
@@ -401,6 +437,23 @@ func ParseLPT(lines []string) LPT {
 	}
 
 	return l
+}
+
+// LimitationsAsMatrix returns tasks' limitations in Matrix form
+func (task LPT) LimitationsAsMatrix() matrix.Matrix {
+	m := matrix.ShellM(len(task.limitations[0].operandsLeft)+1, len(task.limitations))
+
+	for i, lim := range task.limitations {
+		for x, value := range lim.operandsLeft {
+			// place x-es
+			m[i][x] = value
+		}
+
+		// place b also
+		m[i][len(lim.operandsLeft)] = lim.operandRight
+	}
+
+	return m
 }
 
 // LimitationsAsMatrix returns tasks' limitations in Matrix form
@@ -448,7 +501,7 @@ func (task CLPT) DoSimplex() CLPT {
 
 	baseVector := make([]float64, h)
 
-	columns := matrix.Transpose(m)
+	columns := m.Transpose()
 	for x, column := range columns {
 		zerosCount := 0
 		onesCount := 0
@@ -516,4 +569,138 @@ func (task CLPT) DoSimplex() CLPT {
 	newTask := task.SetMatrix(newMatrix)
 
 	return newTask.DoSimplex()
+}
+
+// GenerateDualTask generates dual task for provided one
+func (task LPT) GenerateDualTask() LPT {
+	var newBound Bound
+	if task.targetFunction.bound == BoundMax {
+		newBound = BoundMin
+	} else {
+		newBound = BoundMax
+	}
+
+	limitationsCount := len(task.targetFunction.coeffs)
+	coeffCount := len(task.limitations)
+
+	limitations := make([]Condition, limitationsCount)
+	for i, coeff := range task.targetFunction.coeffs {
+		limitations[i].operandRight = coeff
+	}
+
+	coeffs := make(matrix.Vector, coeffCount)
+	for i, lim := range task.limitations {
+		coeffs[i] = lim.operandRight
+	}
+
+	limitationsMatrix := task.LimitationsAsMatrix()
+	limitationsCoeffsMatrix := make(matrix.Matrix, len(limitationsMatrix))
+	for y, row := range limitationsMatrix {
+		limitationsCoeffsMatrix[y] = row[:len(row)-1]
+	}
+
+	limitationsCoeffsMatrixTransposed := limitationsCoeffsMatrix.Transpose()
+
+	for y, row := range limitationsCoeffsMatrixTransposed {
+		limitations[y].operandsLeft = row
+	}
+
+	for y := range limitations {
+		operator := OperatorEqual
+
+	operatorFinding:
+		for _, signCondition := range task.signConditions {
+			for i, value := range signCondition.operandsLeft {
+				if value == 1 && i == y {
+					operator = signCondition.operator
+					break operatorFinding
+				}
+			}
+		}
+
+		limitations[y].operator = operator
+	}
+
+	vectorWithOneAtIndex := func(length, index int) matrix.Vector {
+		v := matrix.ShellV(length)
+		v[index] = 1
+		return v
+	}
+
+	var signConditions []ConditionZero
+	for y, lim := range task.limitations {
+		if lim.operator != OperatorEqual {
+			signConditions = append(signConditions, ConditionZero{
+				operandsLeft: vectorWithOneAtIndex(len(task.targetFunction.coeffs), y),
+			})
+		}
+	}
+
+	return LPT{
+		limitations,
+		signConditions,
+		TargetFunction{
+			coeffs,
+			newBound,
+		},
+	}
+}
+
+// ToString stringifies LPT
+func (task LPT) ToString() string {
+	str := ""
+	for _, lim := range task.limitations {
+		str += "| "
+		printedCounter := 0
+		for x, value := range lim.operandsLeft {
+			if value != 0 {
+				sign := ""
+				if value > 0 && printedCounter != 0 {
+					sign = "+"
+				}
+
+				str += fmt.Sprintf("%s%.0fx%d ", sign, value, x+1)
+				printedCounter++
+			}
+
+		}
+
+		str += lim.operator.ToString() + " "
+		str += fmt.Sprintf("%.0f", lim.operandRight)
+		str += "\n"
+	}
+
+	for i, condition := range task.signConditions {
+		xIndex := -1
+		for index, value := range condition.operandsLeft {
+			if value == 1 {
+				xIndex = index
+				break
+			}
+		}
+
+		str += fmt.Sprintf("1x%d %s 0", xIndex+1, condition.operator.ToString())
+		if i != len(task.signConditions)-1 {
+			str += ", "
+		}
+	}
+
+	str += "\n"
+	str += "Z = "
+
+	for i, value := range task.targetFunction.coeffs {
+		if value != 0 {
+			sign := ""
+			if value > 0 && i != 0 {
+				sign = "+"
+			}
+
+			str += fmt.Sprintf("%s%.0fx%d ", sign, value, i+1)
+		}
+	}
+
+	str += "-> "
+	str += task.targetFunction.bound.ToString()
+
+	return str
 }
