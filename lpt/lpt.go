@@ -522,7 +522,7 @@ func (task CLPT) DoSimplex() CLPT {
 	}
 
 	calcZ := func(i int) float64 {
-		return matrix.SumV(matrix.MultiplyElementByElement(columns[i], baseVector)) - task.targetFunction.coeffs[i]
+		return matrix.MultiplyElementByElement(columns[i], baseVector).Sum() - task.targetFunction.coeffs[i]
 	}
 
 	B := m.GetLastColumn()

@@ -2,9 +2,178 @@ package game
 
 import "gomo/matrix"
 
-// Matrix is just a Matrix
-type Matrix = matrix.Matrix
+import "math"
 
-func bottomBound(m Matrix) Matrix {
-	return m
+// Bound contains index and value
+type Bound struct {
+	index int
+	value float64
+}
+
+// Bounds contains top and bottom bound
+type Bounds struct {
+	topBound    Bound
+	bottomBound Bound
+}
+
+// Solution contains data about a game solution
+type Solution struct {
+	probabilities1 matrix.Vector
+	probabilities2 matrix.Vector
+	cost           float64
+	bounds         Bounds
+}
+
+// GetBounds calcs alpha and betta bounds
+func GetBounds(m matrix.Matrix) Bounds {
+	// w := m.Width() + 1
+	// h := m.Height() + 1
+	// mAug := matrix.ShellM(w, h).FillWith(m)
+
+	// for _, row := range mAug {
+	// 	row[w - 1] = row.Max()
+	// }
+
+	// for x := 0; x < w; x++ {
+	// 	column := m.GetColumn(x)
+	// 	mAug[h - 1][x] = column.Max()
+	// }
+
+	w := m.Width()
+
+	alphaIndex := -1
+	alphaValue := -math.MaxFloat64
+	for y, row := range m {
+		v := row.Max()
+		if v > alphaValue {
+			alphaIndex = y
+			alphaValue = v
+		}
+	}
+
+	betaIndex := -1
+	betaValue := math.MaxFloat64
+	for x := 0; x < w; x++ {
+		column := m.GetColumn(x)
+		v := column.Max()
+
+		if v < betaValue {
+			betaIndex = x
+			betaValue = v
+		}
+	}
+
+	return Bounds{
+		Bound{
+			alphaIndex,
+			alphaValue,
+		},
+		Bound{
+			betaIndex,
+			betaValue,
+		},
+	}
+}
+
+// Simplify simplifies given matrix
+func Simplify(m matrix.Matrix) matrix.Matrix {
+	w, h := m.Size()
+	removedColumns := matrix.ShellV(w)
+	removedRows := matrix.ShellV(h)
+
+	for y1, row1 := range m {
+		if removedRows[y1] == 1 {
+			continue
+		}
+
+		for y2, row2 := range m {
+			if removedRows[y2] == 1 || y2 == y1 {
+				continue
+			}
+
+			everyIsLess := true
+			for x, el1 := range row1 {
+				everyIsLess = everyIsLess && (removedColumns[x] == 1 || el1 >= row2[x])
+			}
+
+			if everyIsLess {
+				removedRows[y2] = 1
+			}
+		}
+	}
+
+	columns := m.Transpose()
+
+	for x1, column1 := range columns {
+		if removedColumns[x1] == 1 {
+			continue
+		}
+
+		for x2, column2 := range columns {
+			if removedColumns[x2] == 1 || x2 == x1 {
+				continue
+			}
+
+			everyIsBigger := true
+			for y, el1 := range column1 {
+				everyIsBigger = everyIsBigger && (removedRows[y] == 1 || el1 <= column2[y])
+			}
+
+			if everyIsBigger {
+				removedRows[x2] = 1
+			}
+		}
+	}
+
+	removedColumnsCount := removedColumns.CountValue(1)
+	removedRowsCount := removedRows.CountValue(1)
+
+	matrixNew := matrix.ShellM(w-removedColumnsCount, h-removedRowsCount)
+
+	realY := 0
+	for y, row := range m {
+		if removedRows[y] == 1 {
+			continue
+		}
+
+		realX := 0
+		for x, el := range row {
+			if removedColumns[x] == 1 {
+				continue
+			}
+
+			matrixNew[realY][realX] = el
+			realX++
+		}
+
+		realY++
+	}
+
+	return matrixNew
+}
+
+func SolveGame2x2(m matrix.Matrix) Solution {
+	a11 := m[0][0]
+	a21 := m[1][0]
+	a12 := m[0][1]
+	a22 := m[1][1]
+
+	p1 := (a22 - a12) / (a11 - a21 - a12 + a22)
+	p2 := 1 - p1
+
+	q1 := (a22 - a21) / (a11 - a12 - a21 + a22)
+	q2 := 1 - q1
+
+	v := p1*a11 + p2*a12
+
+	bounds := GetBounds(m)
+
+	solution := Solution{
+		probabilities1: matrix.Vector{p1, p2},
+		probabilities2: matrix.Vector{q1, q2},
+		cost:           v,
+		bounds:         bounds,
+	}
+
+	return solution
 }

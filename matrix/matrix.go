@@ -58,13 +58,34 @@ func (m Matrix) Size() (int, int) {
 }
 
 // SumV sums every Vector's value
-func SumV(v Vector) float64 {
+func (v Vector) Sum() float64 {
 	acc := 0.0
 	for _, el := range v {
 		acc += el
 	}
 
 	return acc
+}
+
+func (v Vector) CountValue(value float64) int {
+	count := 0
+	for _, el := range v {
+		if el == value {
+			count++
+		}
+	}
+
+	return count
+}
+
+// Max returns max value of the vector's value
+func (v Vector) Max() float64 {
+	max := 0.0
+	for _, el := range v {
+		max = math.Max(max, el)
+	}
+
+	return max
 }
 
 // Add adds Matrixes element by element
@@ -110,6 +131,19 @@ func (m Matrix) MultiplyWithNumber(value float64) Matrix {
 	return mr
 }
 
+// FillWith fills m1 with m2 values
+func (m Matrix) FillWith(m2 Matrix) Matrix {
+	m3 := m.Clone()
+
+	for y, row := range m2 {
+		for x, value := range row {
+			m3[y][x] = value
+		}
+	}
+
+	return m3
+}
+
 // MultiplyWithNumber multiplies each Vectors's element by value
 func (v Vector) MultiplyWithNumber(value float64) Vector {
 	l := len(v)
@@ -143,7 +177,7 @@ func Multiply(m1, m2 Matrix) Matrix {
 	for y, row := range m1 {
 		for x := 0; x < w2; x++ {
 			v := MultiplyElementByElement(row, m2Columns[x])
-			mr[y][x] = SumV(v)
+			mr[y][x] = v.Sum()
 		}
 	}
 
@@ -169,7 +203,7 @@ func MultiplyRow(m Matrix, rowIndex int, value float64) Matrix {
 }
 
 // DivideRow divides each row's element by value
-func DivideRow(m Matrix, rowIndex int, value float64) Matrix {
+func (m Matrix) DivideRow(rowIndex int, value float64) Matrix {
 	w, h := m.Size()
 	mr := ShellM(w, h)
 
@@ -187,7 +221,7 @@ func DivideRow(m Matrix, rowIndex int, value float64) Matrix {
 }
 
 // SubstractRow substracts rowIndexWhich values mutliplied by multiplier from rowIndexFrom
-func SubstractRow(m Matrix, rowIndexWhich int, rowIndexFrom int, multiplier float64) Matrix {
+func (m Matrix) SubstractRow(rowIndexWhich int, rowIndexFrom int, multiplier float64) Matrix {
 	w, h := m.Size()
 	mr := ShellM(w, h)
 
@@ -261,10 +295,10 @@ func (v Vector) ToString() string {
 
 // BaseVector creates a base vector at provided column with 1 at provided row
 func (m Matrix) BaseVector(rowIndex, columnIndex int) Matrix {
-	mr := DivideRow(m, rowIndex, m[rowIndex][columnIndex])
+	mr := m.DivideRow(rowIndex, m[rowIndex][columnIndex])
 	for y, row := range m {
 		if y != rowIndex {
-			mr = SubstractRow(mr, rowIndex, y, row[columnIndex])
+			mr = mr.SubstractRow(rowIndex, y, row[columnIndex])
 		}
 	}
 
@@ -340,7 +374,7 @@ func (m Matrix) OriginalBaseVector() Matrix {
 
 		for y, row := range mr {
 			if row[w-1] < 0 && y != minBIndex {
-				mr = SubstractRow(mr, minBIndex, y, 1)
+				mr = mr.SubstractRow(minBIndex, y, 1)
 			}
 		}
 
