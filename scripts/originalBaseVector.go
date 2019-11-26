@@ -14,5 +14,5 @@ func OriginalBaseVectorScript() {
 		{0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 300},
 	}
 
-	println(m.OriginalBaseVector().ToString())
+	println(m.OriginalBaseVector().String())
 }

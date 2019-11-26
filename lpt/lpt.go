@@ -88,7 +88,7 @@ type CLPT struct {
 }
 
 // CanonicalForm transforms LPT to CLPT
-func CanonicalForm(task LPT) CLPT {
+func (task LPT) CanonicalForm() CLPT {
 	// variable that shows maximal x's index (starting from 0)
 	maxXIndex := 0
 	for _, lim := range task.limitations {
@@ -300,7 +300,7 @@ func operatorFromString(str string) Operator {
 	return operator
 }
 
-func (operator Operator) ToString() string {
+func (operator Operator) String() string {
 	switch operator {
 	case OperatorGreaterOrEqual:
 		return ">="
@@ -317,7 +317,7 @@ func (operator Operator) ToString() string {
 	return "Undefined"
 }
 
-func (bound Bound) ToString() string {
+func (bound Bound) String() string {
 	if bound == BoundMax {
 		return "(max)"
 	} else {
@@ -473,6 +473,50 @@ func (task CLPT) LimitationsAsMatrix() matrix.Matrix {
 	return m
 }
 
+func (task LPT) SetSignConditionToEvery(operator Operator) LPT {
+	signConditions := make([]ConditionZero, len(task.limitations[0].operandsLeft))
+	for i := range signConditions {
+		signConditions[i] = ConditionZero{
+			matrix.ShellV(len(signConditions)).SetValue(i, 1),
+			operator,
+		}
+	}
+
+	return LPT{
+		task.limitations,
+		signConditions,
+		task.targetFunction,
+	}
+}
+
+func (task LPT) SetTargetFunction(targetFunction TargetFunction) LPT {
+	return LPT{
+		task.limitations,
+		task.signConditions,
+		targetFunction,
+	}
+}
+
+// SetMatrix sets limitations for a LPT
+func (task LPT) SetMatrix(m matrix.Matrix, operators []Operator) LPT {
+	limitations := make([]Condition, len(task.limitations))
+
+	for y, row := range m {
+		lastIndex := len(row) - 1
+		limitations[y] = Condition{
+			operandsLeft: row[:lastIndex],
+			operandRight: row[lastIndex],
+			operator:     operators[y],
+		}
+	}
+
+	return LPT{
+		limitations:    limitations,
+		signConditions: task.signConditions,
+		targetFunction: task.targetFunction,
+	}
+}
+
 // SetMatrix sets limitations for a CLPT
 func (task CLPT) SetMatrix(m matrix.Matrix) CLPT {
 	limitations := make([]ConditionEqual, len(task.limitations))
@@ -522,7 +566,9 @@ func (task CLPT) DoSimplex() CLPT {
 	}
 
 	calcZ := func(i int) float64 {
-		return matrix.MultiplyElementByElement(columns[i], baseVector).Sum() - task.targetFunction.coeffs[i]
+		product := matrix.MultiplyElementByElement(columns[i], baseVector).Sum()
+		coeff := task.targetFunction.coeffs[i]
+		return product - coeff
 	}
 
 	B := m.GetLastColumn()
@@ -553,9 +599,9 @@ func (task CLPT) DoSimplex() CLPT {
 	}
 
 	println("Matrix of b_i / a_ik")
-	println(zCoeffs.ToString())
+	println(zCoeffs.String())
 	println("Vector of z-coeffs")
-	println(zValues.ToString())
+	println(zValues.String())
 
 	if minValueX == -1 {
 		return task
@@ -569,6 +615,21 @@ func (task CLPT) DoSimplex() CLPT {
 	newTask := task.SetMatrix(newMatrix)
 
 	return newTask.DoSimplex()
+}
+
+func (op Operator) Opposite() Operator {
+	switch op {
+	case OperatorGreater:
+		return OperatorLess
+	case OperatorGreaterOrEqual:
+		return OperatorLessOrEqual
+	case OperatorLess:
+		return OperatorGreater
+	case OperatorLessOrEqual:
+		return OperatorGreaterOrEqual
+	}
+
+	return op
 }
 
 // GenerateDualTask generates dual task for provided one
@@ -612,7 +673,7 @@ func (task LPT) GenerateDualTask() LPT {
 		for _, signCondition := range task.signConditions {
 			for i, value := range signCondition.operandsLeft {
 				if value == 1 && i == y {
-					operator = signCondition.operator
+					operator = signCondition.operator.Opposite()
 					break operatorFinding
 				}
 			}
@@ -631,7 +692,8 @@ func (task LPT) GenerateDualTask() LPT {
 	for y, lim := range task.limitations {
 		if lim.operator != OperatorEqual {
 			signConditions = append(signConditions, ConditionZero{
-				operandsLeft: vectorWithOneAtIndex(len(task.targetFunction.coeffs), y),
+				operandsLeft: vectorWithOneAtIndex(len(task.limitations), y),
+				operator:     OperatorGreaterOrEqual,
 			})
 		}
 	}
@@ -646,8 +708,43 @@ func (task LPT) GenerateDualTask() LPT {
 	}
 }
 
-// ToString stringifies LPT
-func (task LPT) ToString() string {
+// ToLPT CPLT -> LPT
+func (task CLPT) ToLPT() LPT {
+	limitations := make([]Condition, len(task.limitations))
+	for i, lim := range task.limitations {
+		limitations[i] = Condition{
+			operandsLeft: lim.operandsLeft,
+			operator:     OperatorEqual,
+			operandRight: lim.operandRight,
+		}
+	}
+
+	signConditions := make([]ConditionZero, len(task.signConditions))
+	for i, cond := range task.signConditions {
+		signConditions[i] = ConditionZero{
+			operandsLeft: cond.operandsLeft,
+			operator:     OperatorGreater,
+		}
+	}
+
+	targetFunction := TargetFunction{
+		coeffs: task.targetFunction.coeffs,
+		bound:  BoundMin,
+	}
+
+	return LPT{
+		limitations:    limitations,
+		signConditions: signConditions,
+		targetFunction: targetFunction,
+	}
+}
+
+func (task CLPT) String() string {
+	return task.ToLPT().String()
+}
+
+// String stringifies LPT
+func (task LPT) String() string {
 	str := ""
 	for _, lim := range task.limitations {
 		str += "| "
@@ -659,14 +756,15 @@ func (task LPT) ToString() string {
 					sign = "+"
 				}
 
-				str += fmt.Sprintf("%s%.0fx%d ", sign, value, x+1)
+				str += fmt.Sprintf("%s%sx%d ", sign, matrix.HumaniazeValue(value), x+1)
+
 				printedCounter++
 			}
 
 		}
 
-		str += lim.operator.ToString() + " "
-		str += fmt.Sprintf("%.0f", lim.operandRight)
+		str += lim.operator.String() + " "
+		str += matrix.HumaniazeValue(lim.operandRight)
 		str += "\n"
 	}
 
@@ -679,7 +777,7 @@ func (task LPT) ToString() string {
 			}
 		}
 
-		str += fmt.Sprintf("1x%d %s 0", xIndex+1, condition.operator.ToString())
+		str += fmt.Sprintf("1x%d %s 0", xIndex+1, condition.operator.String())
 		if i != len(task.signConditions)-1 {
 			str += ", "
 		}
@@ -695,12 +793,12 @@ func (task LPT) ToString() string {
 				sign = "+"
 			}
 
-			str += fmt.Sprintf("%s%.0fx%d ", sign, value, i+1)
+			str += fmt.Sprintf("%s%sx%d ", sign, matrix.HumaniazeValue(value), i+1)
 		}
 	}
 
 	str += "-> "
-	str += task.targetFunction.bound.ToString()
+	str += task.targetFunction.bound.String()
 
 	return str
 }

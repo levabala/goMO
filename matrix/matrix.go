@@ -17,6 +17,28 @@ func ShellV(length int) Vector {
 	return v
 }
 
+// ShellVWithValue it's ShellV with value
+func ShellVWithValue(length int, value float64) Vector {
+	v := ShellV(length)
+
+	for i := range v {
+		v[i] = value
+	}
+
+	return v
+}
+
+// ShellMWithValue it's ShellN with value
+func ShellMWithValue(width, height int, value float64) Matrix {
+	m := make(Matrix, height)
+
+	for y := range m {
+		m[y] = make(Vector, width)
+	}
+
+	return m
+}
+
 // ShellM generates Matrix wth specified size filled with 0
 func ShellM(width, height int) Matrix {
 	m := make(Matrix, height)
@@ -67,6 +89,15 @@ func (v Vector) Sum() float64 {
 	return acc
 }
 
+func HumaniazeValue(value float64) string {
+	remain := value - math.Round(value)
+	if remain < 10e-3 {
+		return fmt.Sprintf("%.0f", value)
+	}
+
+	return fmt.Sprintf("%.3f", value)
+}
+
 func (v Vector) CountValue(value float64) int {
 	count := 0
 	for _, el := range v {
@@ -86,6 +117,36 @@ func (v Vector) Max() float64 {
 	}
 
 	return max
+}
+
+// Min returns min value of the vector's value
+func (v Vector) Min() float64 {
+	min := 0.0
+	for _, el := range v {
+		min = math.Min(min, el)
+	}
+
+	return min
+}
+
+// Max returns max value of the vector's value
+func (m Matrix) Max() float64 {
+	max := 0.0
+	for _, row := range m {
+		max = math.Max(max, row.Max())
+	}
+
+	return max
+}
+
+// Min returns min value of the vector's value
+func (m Matrix) Min() float64 {
+	min := 0.0
+	for _, row := range m {
+		min = math.Min(min, row.Min())
+	}
+
+	return min
 }
 
 // Add adds Matrixes element by element
@@ -274,21 +335,21 @@ func minInt(i1, i2 int) int {
 	return i2
 }
 
-// ToString converts Matrix to string
-func (m Matrix) ToString() string {
+// String converts Matrix to string
+func (m Matrix) String() string {
 	s := ""
 	for _, row := range m {
-		s += row.ToString()
+		s += row.String()
 		s += "\n"
 	}
 	return s
 }
 
-// ToString converts Vector to string
-func (v Vector) ToString() string {
+// String converts Vector to string
+func (v Vector) String() string {
 	s := ""
 	for _, element := range v {
-		s += fmt.Sprintf("%5.1f", element) + " "
+		s += fmt.Sprintf("%6.3f", element) + " "
 	}
 	return s
 }
@@ -350,16 +411,26 @@ func (m Matrix) OriginalBaseVector() Matrix {
 	w := m.Width()
 
 	println("start")
-	println(m.ToString())
+	println(m.String())
 
 	mr := m.Gauss()
 	println("after gauss")
-	println(mr.ToString())
+	println(mr.String())
 
 	i := 0
 	for {
-
 		B := mr.GetLastColumn()
+
+		everyIsPositive := true
+		for _, b := range B {
+			everyIsPositive = everyIsPositive && b > 0
+		}
+
+		if everyIsPositive {
+			println("success")
+			break
+		}
+		println("still not every b > 0")
 
 		minBIndex := -1
 		minBValue := 0.0
@@ -379,12 +450,12 @@ func (m Matrix) OriginalBaseVector() Matrix {
 		}
 
 		println("after substrtact")
-		println(mr.ToString())
+		println(mr.String())
 
 		mr = MultiplyRow(mr, minBIndex, -1)
 
 		println("after mutliply -1")
-		println(mr.ToString())
+		println(mr.String())
 
 		pivotColumnIndex := -1
 		for x, a := range mr[minBIndex] {
@@ -409,25 +480,19 @@ func (m Matrix) OriginalBaseVector() Matrix {
 
 		// fmt.Printf()
 		// println("pre-baseVector")
-		// println(mr.ToString())
+		// println(mr.String())
 
 		fmt.Printf("pivot at x: %d, y: %d\n", pivotColumnIndex, pivotRowIndex)
 		mr = mr.BaseVector(pivotRowIndex, pivotColumnIndex)
 
 		println("after base vector")
-		println(mr.ToString())
-
-		B = mr.GetLastColumn()
-		everyIsPositive := true
-		for _, b := range B {
-			everyIsPositive = everyIsPositive && b > 0
-		}
-
-		if everyIsPositive {
-			println("success")
-			break
-		}
-		println("still not every b > 0")
+		println(mr.String())
 	}
+
 	return mr
+}
+
+func (v Vector) SetValue(index int, value float64) Vector {
+	v[index] = value
+	return v
 }

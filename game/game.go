@@ -1,8 +1,11 @@
 package game
 
-import "gomo/matrix"
-
-import "math"
+import (
+	"fmt"
+	"gomo/lpt"
+	"gomo/matrix"
+	"math"
+)
 
 // Bound contains index and value
 type Bound struct {
@@ -22,6 +25,20 @@ type Solution struct {
 	probabilities2 matrix.Vector
 	cost           float64
 	bounds         Bounds
+}
+
+// String stringifies provided bound
+func (b Bound) String() string {
+	return fmt.Sprintf("index: %d, value: %f", b.index, b.value)
+}
+
+// String stringifies provided bounds
+func (bs Bounds) String() string {
+	return fmt.Sprintf("top:\t(%s)\nbottom:\t(%s)", bs.topBound, bs.bottomBound)
+}
+
+func (s Solution) String() string {
+	return fmt.Sprintf("ps1:\t[%s]\nps2:\t[%s]\ncost:\t%f\nbounds:\n%s", s.probabilities1, s.probabilities2, s.cost, s.bounds)
 }
 
 // GetBounds calcs alpha and betta bounds
@@ -60,6 +77,10 @@ func GetBounds(m matrix.Matrix) Bounds {
 		if v < betaValue {
 			betaIndex = x
 			betaValue = v
+
+			if betaIndex == alphaIndex {
+				break
+			}
 		}
 	}
 
@@ -152,6 +173,7 @@ func Simplify(m matrix.Matrix) matrix.Matrix {
 	return matrixNew
 }
 
+// SolveGame2x2 solves game2x2
 func SolveGame2x2(m matrix.Matrix) Solution {
 	a11 := m[0][0]
 	a21 := m[1][0]
@@ -176,4 +198,33 @@ func SolveGame2x2(m matrix.Matrix) Solution {
 	}
 
 	return solution
+}
+
+// SolveGame solves game mxn
+func SolveGame(m matrix.Matrix) Solution {
+	minValue := m.Min()
+	wOriginal, hOriginal := m.Size()
+	lptMatrix := matrix.ShellM(wOriginal+1, hOriginal+1).FillWith(m)
+	w, _ := lptMatrix.Size()
+
+	for _, row := range lptMatrix {
+		row[w-1] = 1
+	}
+
+	if minValue < 0 {
+		appendix := minValue*-1 + 1
+
+		for y, row := range lptMatrix {
+			for x, el := range row {
+				lptMatrix[y][x] = el + appendix
+			}
+		}
+	}
+
+	operators := make([]lpt.Operator, len(lptMatrix))
+	for i := range operators {
+		operators[i] = lpt.OperatorLessOrEqual
+	}
+
+	lpt := lpt.LPT{}.SetMatrix(lptMatrix, operators).SetSignConditionToEvery(lpt.OperatorGreaterOrEqual)
 }

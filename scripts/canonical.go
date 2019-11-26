@@ -15,5 +15,5 @@ func CanonicalScript() {
 Z = 1x1 -2x3 -> (max)`
 
 	l := lpt.ParseLPT(strings.Split(input, "\n")[1:])
-	lpt.CanonicalForm(l)
+	l.CanonicalForm()
 }

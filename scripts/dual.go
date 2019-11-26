@@ -17,5 +17,5 @@ Z = 3x1 +2x2 -3x3 +5x4 -> (min)`
 
 	println(input[1:])
 	println("\nto\n")
-	println(l.GenerateDualTask().ToString())
+	println(l.GenerateDualTask().String())
 }
