@@ -202,29 +202,84 @@ func SolveGame2x2(m matrix.Matrix) Solution {
 
 // SolveGame solves game mxn
 func SolveGame(m matrix.Matrix) Solution {
+	m = m.Clone().Transpose()
 	minValue := m.Min()
 	wOriginal, hOriginal := m.Size()
-	lptMatrix := matrix.ShellM(wOriginal+1, hOriginal+1).FillWith(m)
+
+	appendix := 0.0
+	if minValue < 0 {
+		appendix = minValue*-1 + 1
+
+		for y, row := range m {
+			for x, el := range row {
+				m[y][x] = el + appendix
+			}
+		}
+	}
+
+	lptMatrix := matrix.ShellM(wOriginal+1, hOriginal).FillWith(m)
 	w, _ := lptMatrix.Size()
 
 	for _, row := range lptMatrix {
 		row[w-1] = 1
 	}
 
-	if minValue < 0 {
-		appendix := minValue*-1 + 1
+	println("Start matrix:")
+	println(lptMatrix.String())
+	println()
 
-		for y, row := range lptMatrix {
-			for x, el := range row {
-				lptMatrix[y][x] = el + appendix
-			}
-		}
-	}
+	println("With appendix:")
+	println(lptMatrix.String())
+	println()
 
 	operators := make([]lpt.Operator, len(lptMatrix))
 	for i := range operators {
 		operators[i] = lpt.OperatorLessOrEqual
 	}
 
-	lpt := lpt.LPT{}.SetMatrix(lptMatrix, operators).SetSignConditionToEvery(lpt.OperatorGreaterOrEqual)
+	l := lpt.LPT{}.
+		SetMatrix(lptMatrix, operators).
+		SetSignConditionToEvery(lpt.OperatorGreaterOrEqual).
+		SetDefaultTargetFunction()
+
+	println("Resulting LPT:")
+	println(l.String())
+	println()
+
+	ld := l.GenerateDualTask()
+
+	println("Dual LPT:")
+	println(ld.String())
+	println()
+
+	ldc := ld.CanonicalForm()
+
+	println("Canonical LPT:")
+	println(ldc.String())
+	println()
+
+	ml := ldc.LimitationsAsMatrix().OriginalBaseVector()
+	ldcs, zValues := ldc.SetMatrix(ml).DoSimplex()
+	mlres := ldcs.LimitationsAsMatrix()
+
+	println()
+	println(mlres.String())
+
+	basis2 := mlres.GetBasis()
+	println(basis2.String())
+
+	valuesForY := basis2[:len(zValues)-hOriginal]
+	basis2WithZeros := make(matrix.Vector, len(basis2)).FillWith(valuesForY)
+
+	gameCost := 1 / ldcs.ToLPT().MutliplyTargetFunctionWith(basis2WithZeros).Sum()
+
+	probabilities2 := valuesForY.MultiplyWithNumber(gameCost)
+
+	probabilities1 := zValues[len(zValues)-hOriginal : len(zValues)-1].MultiplyWithNumber(gameCost)
+
+	return Solution{
+		probabilities1: probabilities1,
+		probabilities2: probabilities2,
+		cost:           gameCost - appendix,
+	}
 }

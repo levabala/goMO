@@ -84,7 +84,7 @@ type ConditionZero struct {
 type CLPT struct {
 	limitations    []ConditionEqual
 	signConditions []ConditionZeroPositive
-	targetFunction TargetFunctionMin
+	targetFunction TargetFunction
 }
 
 // CanonicalForm transforms LPT to CLPT
@@ -103,9 +103,9 @@ func (task LPT) CanonicalForm() CLPT {
 	// I. Minimize target function
 	targetFunctionCoeffs := task.targetFunction.coeffs
 
-	if task.targetFunction.bound == BoundMax {
-		targetFunctionCoeffs = targetFunctionCoeffs.MultiplyWithNumber(-1)
-	}
+	// if task.targetFunction.bound == BoundMax {
+	// 	targetFunctionCoeffs = targetFunctionCoeffs.MultiplyWithNumber(-1)
+	// }
 
 	// II. Map all operators to Equal by adding new x-es (also appending new x-es to singConditions)
 	limitations := make([]ConditionEqual, len(task.limitations))
@@ -153,8 +153,6 @@ func (task LPT) CanonicalForm() CLPT {
 	newXesCount := maxXIndex - maxXIndexAtStart
 	signConditions := make([]ConditionZeroPositive, len(task.signConditions)+newXesCount)
 
-	// TODO: transform non-ZeroPositive conditions to ZeroPositive
-	// copying already existing signConditions to new variable
 	for i, el := range task.signConditions {
 		signConditions[i] = ConditionZeroPositive{
 			operandsLeft: el.operandsLeft,
@@ -244,8 +242,9 @@ func (task LPT) CanonicalForm() CLPT {
 		targetFunctionCoeffsWithLength[i] = v
 	}
 
-	targetFunction := TargetFunctionMin{
+	targetFunction := TargetFunction{
 		targetFunctionCoeffsWithLength,
+		task.targetFunction.bound,
 	}
 
 	return CLPT{
@@ -499,7 +498,7 @@ func (task LPT) SetTargetFunction(targetFunction TargetFunction) LPT {
 
 // SetMatrix sets limitations for a LPT
 func (task LPT) SetMatrix(m matrix.Matrix, operators []Operator) LPT {
-	limitations := make([]Condition, len(task.limitations))
+	limitations := make([]Condition, len(m))
 
 	for y, row := range m {
 		lastIndex := len(row) - 1
@@ -537,13 +536,13 @@ func (task CLPT) SetMatrix(m matrix.Matrix) CLPT {
 }
 
 // DoSimplex performs Simplex transformation
-func (task CLPT) DoSimplex() CLPT {
+func (task CLPT) DoSimplex() (CLPT, matrix.Vector) {
 	println("\nAnother one Simplex iteration")
 
 	m := task.LimitationsAsMatrix()
 	w, h := m.Size()
 
-	baseVector := make([]float64, h)
+	baseVector := make(matrix.Vector, h)
 
 	columns := m.Transpose()
 	for x, column := range columns {
@@ -566,7 +565,7 @@ func (task CLPT) DoSimplex() CLPT {
 	}
 
 	calcZ := func(i int) float64 {
-		product := matrix.MultiplyElementByElement(columns[i], baseVector).Sum()
+		product := columns[i].MultiplyElementByElement(baseVector).Sum()
 		coeff := task.targetFunction.coeffs[i]
 		return product - coeff
 	}
@@ -575,43 +574,71 @@ func (task CLPT) DoSimplex() CLPT {
 
 	zValues := matrix.ShellV(len(columns))
 	zCoeffs := matrix.ShellM(m.Size())
-	minValueX := -1
-	minValueY := -1
-	minValue := math.MaxFloat64
-	for x, column := range columns {
-		z := calcZ(x)
-		zValues[x] = z
+	supportValueX := -1
+	supportValueY := -1
 
-		if z > 0 && x < w-1 {
-			for y, el := range column {
-				if el > 0 {
-					c := B[y] / el
-					zCoeffs[y][x] = c
+	var supportValue float64
 
-					if c < minValue {
-						minValueX = x
-						minValueY = y
-						minValue = c
+	if task.targetFunction.bound == BoundMin {
+		supportValue = math.MaxFloat64
+		for x, column := range columns {
+			z := calcZ(x)
+			zValues[x] = z
+
+			if z > 0 && x < w-1 {
+				for y, el := range column {
+					if el > 0 {
+						c := B[y] / el
+						zCoeffs[y][x] = c
+
+						if c < supportValue {
+							supportValueX = x
+							supportValueY = y
+							supportValue = c
+						}
+					}
+				}
+			}
+		}
+	} else {
+		supportValue = -math.MaxFloat64
+		for x, column := range columns {
+			z := calcZ(x)
+			zValues[x] = z
+
+			if z < 0 && x < w-1 {
+				for y, el := range column {
+					if el > 0 {
+						c := B[y] / el
+						zCoeffs[y][x] = c
+
+						if c > supportValue {
+							supportValueX = x
+							supportValueY = y
+							supportValue = c
+						}
 					}
 				}
 			}
 		}
 	}
 
+	// TODO: select row by the biggest value (zValues[x] * min(column of zCoeffs[x]))
+
 	println("Matrix of b_i / a_ik")
 	println(zCoeffs.String())
 	println("Vector of z-coeffs")
 	println(zValues.String())
 
-	if minValueX == -1 {
-		return task
+	if supportValueX == -1 {
+		return task, zValues
 	}
 
 	println()
 	println("Gonna find BaseVector at this point")
-	fmt.Printf("x: %d y: %d\n", minValueX, minValueY)
+	fmt.Printf("x: %d y: %d\n", supportValueX, supportValueY)
 
-	newMatrix := m.BaseVector(minValueY, minValueX)
+	newMatrix := m.BaseVector(supportValueY, supportValueX)
 	newTask := task.SetMatrix(newMatrix)
 
 	return newTask.DoSimplex()
@@ -801,4 +828,23 @@ func (task LPT) String() string {
 	str += task.targetFunction.bound.String()
 
 	return str
+}
+
+// SetDefaultTargetFunction sets target function like Z = x1 + x2 + x3 + ... -> (max)
+func (task LPT) SetDefaultTargetFunction() LPT {
+	targetFunction := TargetFunction{
+		coeffs: matrix.ShellVWithValue(len(task.limitations[0].operandsLeft), 1),
+		bound:  BoundMin,
+	}
+
+	return LPT{
+		task.limitations,
+		task.signConditions,
+		targetFunction,
+	}
+}
+
+// MutliplyTargetFunctionWith multiplies LPT.targetFunction with a vector
+func (task LPT) MutliplyTargetFunctionWith(v matrix.Vector) matrix.Vector {
+	return task.targetFunction.coeffs.MultiplyElementByElement(v)
 }

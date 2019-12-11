@@ -23,7 +23,8 @@ Z = 50x1 +100x2 +200x3 +160x4 +130x5 +170x6 -> (min)`
 
 	lcc := lc.SetMatrix(m)
 
-	res := lcc.DoSimplex().LimitationsAsMatrix().String()
+	lccs, _ := lcc.DoSimplex()
+	res := lccs.LimitationsAsMatrix().String()
 	println()
 	println("Result:")
 	println(res)

@@ -50,6 +50,22 @@ func ShellM(width, height int) Matrix {
 	return m
 }
 
+// FindIndex finds the index of a value
+func (v Vector) FindIndex(value float64) int {
+	for i, val := range v {
+		if val == value {
+			return i
+		}
+	}
+
+	return -1
+}
+
+// IsBaseVector checks if the vector is base-vector
+func (v Vector) IsBaseVector() bool {
+	return v.CountValue(0) == len(v)-1 && v.CountValue(1) == 1
+}
+
 // Transpose performce Matrix transposation
 func (m Matrix) Transpose() Matrix {
 	w, h := m.Size()
@@ -205,6 +221,16 @@ func (m Matrix) FillWith(m2 Matrix) Matrix {
 	return m3
 }
 
+func (v Vector) FillWith(v2 Vector) Vector {
+	v3 := v.Clone()
+
+	for i, val := range v2 {
+		v3[i] = val
+	}
+
+	return v3
+}
+
 // MultiplyWithNumber multiplies each Vectors's element by value
 func (v Vector) MultiplyWithNumber(value float64) Vector {
 	l := len(v)
@@ -218,7 +244,7 @@ func (v Vector) MultiplyWithNumber(value float64) Vector {
 }
 
 // MultiplyElementByElement multiplies two vectors element by element
-func MultiplyElementByElement(v1, v2 Vector) Vector {
+func (v1 Vector) MultiplyElementByElement(v2 Vector) Vector {
 	v := ShellV(len(v1))
 	for i, el1 := range v1 {
 		v[i] = el1 * v2[i]
@@ -237,7 +263,7 @@ func Multiply(m1, m2 Matrix) Matrix {
 
 	for y, row := range m1 {
 		for x := 0; x < w2; x++ {
-			v := MultiplyElementByElement(row, m2Columns[x])
+			v := row.MultiplyElementByElement(m2Columns[x])
 			mr[y][x] = v.Sum()
 		}
 	}
@@ -492,7 +518,25 @@ func (m Matrix) OriginalBaseVector() Matrix {
 	return mr
 }
 
+// SetValue sets a value at an index
 func (v Vector) SetValue(index int, value float64) Vector {
 	v[index] = value
 	return v
+}
+
+func (m Matrix) GetBasis() Vector {
+	columns := m.Transpose()
+	basis := ShellV(len(columns))
+
+	B := m.GetLastColumn()
+
+	for x, column := range columns {
+		isBase := column.IsBaseVector()
+		if isBase {
+			bIndex := column.FindIndex(1)
+			basis[x] = B[bIndex]
+		}
+	}
+
+	return basis
 }

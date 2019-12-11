@@ -47,8 +47,8 @@ func Game2x2() {
 	println(solution.String())
 }
 
-// GameSolve GameSolve
-func GameSolve() {
+// GameSolveWithSyntheticInput GameSolveWithSyntheticInput
+func GameSolveWithSyntheticInput() {
 	input := `
 | 13x1 +3x2 +11x3 >= 1
 | 1x1 +14x2 +12x3 >= 1
@@ -62,7 +62,7 @@ Z = 1x1 +1x2 +1x3 -> (min)`
 	ldc := ld.CanonicalForm()
 	m := ldc.LimitationsAsMatrix().OriginalBaseVector()
 
-	ldcs := ldc.SetMatrix(m).DoSimplex()
+	ldcs, _ := ldc.SetMatrix(m).DoSimplex()
 
 	mres := ldcs.LimitationsAsMatrix()
 
@@ -76,4 +76,31 @@ Z = 1x1 +1x2 +1x3 -> (min)`
 	println(ldcs.String())
 	println("\nwhere matrix is")
 	println(mres.String())
+}
+
+// GameSolve GameSolve
+func GameSolve() {
+	// var 15
+	// m := matrix.Matrix{
+	// 	{4, -8, -5, 4},
+	// 	{-6, 5, 8, 5},
+	// 	{2, 3, -7, 3},
+	// }
+
+	// var 13
+	m := matrix.Matrix{
+		{-8, -5, 4, 1},
+		{3, 8, 5, 7},
+		{5, 3, -8, -9},
+	}
+
+	// var 14
+	// m := matrix.Matrix{
+	// 	{4, -8, -5, 4},
+	// 	{-6, 5, 8, 5},
+	// 	{2, 3, -7, 3},
+	// }
+
+	solution := game.SolveGame(m)
+	println(solution.String())
 }
